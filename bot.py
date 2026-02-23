@@ -212,6 +212,95 @@ def handle_turnstile(driver):
 
 # ... (Baki functions jaise extract_book_details, download_book_file, process_with_gemini same rahenge) ...
 
+def select_extract_and_download(driver, history):
+    # Cloudflare बायपास होने के बाद का पहला स्क्रीनशॉट
+    take_screenshot(driver, "3_after_cloudflare_bypass")
+
+    # रैंडम बुक खोजना
+    driver.execute_script("window.scrollBy(0, 800);")
+    time.sleep(3)
+    take_screenshot(driver, "4_scrolling_for_books")
+
+    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
+    book_urls = [l.get_attribute('href') for l in links if l.get_attribute('href')]
+    available = list(set([u for u in book_urls if u not in history]))
+    
+    if not available: return None
+        
+    selected_book = random.choice(available)
+    driver.get(selected_book)
+    time.sleep(8)
+    # बुक पेज का स्क्रीनशॉट
+    take_screenshot(driver, "5_book_detail_page")
+
+    # Title और Description कॉपी करना
+    try: original_title = driver.find_element(By.TAG_NAME, "h1").text
+    except: original_title = "Unknown Title"
+
+    try: original_desc = driver.find_element(By.CSS_SELECTOR, "h1 ~ div.description, h1 ~ div, h1 ~ p").text
+    except: original_desc = ""
+
+    # Original Cover Image डाउनलोड करना
+    try:
+        img_url = driver.find_element(By.CSS_SELECTOR, "img.cover, .book-cover img").get_attribute('src')
+        with open("original_cover.jpg", "wb") as f: f.write(requests.get(img_url).content)
+    except: pass
+
+    # PDF डाउनलोड करना
+    try:
+        driver.find_element(By.XPATH, "//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download')]").click()
+        take_screenshot(driver, "6_download_started")
+        time.sleep(60) # डाउनलोड होने का वेट
+        
+        files = glob.glob(f'{DOWNLOAD_DIR}/*.pdf')
+        if files: 
+            return original_title, original_desc, max(files, key=os.path.getctime)
+    except: pass
+
+    return None, None, None
+
+
+def process_with_your_prompt(title, desc):
+    cover_path = "original_cover.jpg"
+    new_title, new_desc = title, desc
+    
+    user_prompt = f"""You are a professional book cover designer.
+Step 1 — Analyze: Carefully analyze the attached book cover image and identify book genre, emotional tone, target audience, main theme or message, visual symbolism used.
+Step 2 — Transform: Create a completely NEW and ORIGINAL ebook cover inspired only by the idea and category, NOT the design.
+Mandatory changes: Generate a new original title with similar meaning (do not reuse original words), Remove author names, publisher info, badges, edition labels, or quotes, Replace visuals with a different symbolic concept representing the same theme, Change layout and composition, Use new color palette appropriate to the genre, Use modern bold readable typography.
+Design requirements: Professional premium bestseller style, Minimal clean layout, Strong central visual metaphor, High contrast thumbnail readability, Square format (1:1).
+Rules: Do NOT copy the illustration, Do NOT replicate colors arrangement, Do NOT imitate font style, Do NOT keep recognizable elements, The result must look like a different book from the same category.
+Output Requirements: Based on the above, provide the following exactly:
+NEW_TITLE: [Your generated title]
+NEW_DESC: [Write a short catchy description for this book]
+IMAGE_PROMPT: [Write a detailed text-to-image prompt without any text/words to generate this cover]"""
+
+    try:
+        # Vision Model से टाइटल, डिस्क्रिप्शन और इमेज का प्रॉम्प्ट निकालना
+        vision_model = genai.GenerativeModel('gemini-1.5-flash')
+        img_file = Image.open("original_cover.jpg")
+        response = vision_model.generate_content([user_prompt, img_file]).text
+        
+        image_gen_prompt = ""
+        for line in response.split('\n'):
+            if line.startswith("NEW_TITLE:"): new_title = line.replace("NEW_TITLE:", "").strip()
+            elif line.startswith("NEW_DESC:"): new_desc = line.replace("NEW_DESC:", "").strip()
+            elif line.startswith("IMAGE_PROMPT:"): image_gen_prompt = line.replace("IMAGE_PROMPT:", "").strip()
+
+        # Imagen Model से एक्चुअल फोटो डाउनलोड/जनरेट करना
+        if image_gen_prompt:
+            imagen_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+            result = imagen_model.generate_images(prompt=image_gen_prompt, number_of_images=1, aspect_ratio="1:1")
+            result.images[0].save("final_cover.jpg")
+            cover_path = "final_cover.jpg"
+            print("Naya cover image successfully generate ho gaya!")
+    except Exception as e:
+        print(f"Gemini error: {e}")
+
+    return new_title, new_desc, cover_path
+
+
+
 def main():
     history_file = "last_post.txt"
     history = []
