@@ -34,6 +34,14 @@ jobs:
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" python bot.py
 
+      - name: Upload Screenshots for Review
+        uses: actions/upload-artifact@v4
+        if: always() # Yeh line zaroori hai taaki fail hone par bhi aap dekh sakein kya hua
+        with:
+          name: automation-visuals
+          path: ./*.png
+          retention-days: 1 # 1 din tak screenshots GitHub par rahenge
+
       - name: Save History to GitHub
         run: |
           git config --global user.name "GitHub Actions Bot"
