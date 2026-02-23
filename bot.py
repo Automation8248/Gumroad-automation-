@@ -57,23 +57,43 @@ def bypass_cloudflare_and_get_book(driver, history):
     except:
         pass
 
-    print("Books dhoondh rahe hain...")
+    # IMPORTANT: Page ko thoda scroll karenge taaki hidden books load ho jayein
+    print("Page scroll kar rahe hain taaki saari books load ho jayein...")
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/3);")
     time.sleep(5)
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+    time.sleep(5)
+
+    print("Books dhoondh rahe hain...")
     
-    # FIX: Screenshot ke anusaar, book pages ke URL mein hamesha '/md5/' hota hai.
-    # Hum sirf wahi links nikalenge jisme '/md5/' ho.
-    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
+    # Page par jitne bhi 'a' (links) tags hain sab utha lenge
+    links = driver.find_elements(By.TAG_NAME, "a")
+    print(f"Total links found on page: {len(links)}")
+    
     book_urls = []
-    
     for link in links:
-        href = link.get_attribute('href')
-        if href:
-            book_urls.append(href)
+        try:
+            href = link.get_attribute('href')
+            if href and base_url in href:
+                # Faltu links ko ignore karenge
+                if "search" not in href and "donate" not in href and "login" not in href and "account" not in href:
+                    # Book ki links hamesha lambi hoti hain (jaise md5 hash), isliye 40 char se badi links ko lenge
+                    if len(href) > 40 or '/md5/' in href:
+                        book_urls.append(href)
+        except:
+            pass
             
+    # Duplicate links ko hata denge
+    book_urls = list(set(book_urls))
+    print(f"Filtered Book Links ki ginti: {len(book_urls)}")
+    
     available_books = list(set([u for u in book_urls if u not in history]))
     
     if not available_books:
-        print("Koi nayi book nahi mili! (URL /md5/ match nahi hua)")
+        print("Koi nayi book nahi mili! Debug ke liye saari links print kar rahe hain:")
+        # Agar koi book na mile toh log mein show karega ki kya kya mila tha
+        for u in book_urls:
+            print("Found URL:", u)
         return None
         
     selected_book = random.choice(available_books)
@@ -81,7 +101,7 @@ def bypass_cloudflare_and_get_book(driver, history):
     
     # Book ke detail page par jaana
     driver.get(selected_book)
-    time.sleep(6) # Page fully load hone ka wait
+    time.sleep(8) # Detail page fully load hone ka wait
     
     return selected_book
     
