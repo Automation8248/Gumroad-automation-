@@ -1,51 +1,22 @@
-name: Gumroad Book Publisher via Gemini
-
+name: Gumroad Ebook Auto-Upload
 on:
   schedule:
-    - cron: '44 4 * * *'
+    - cron: '14 23 */2 * *' # 23:14 UTC = 4:44 AM IST (Alternate Days)
   workflow_dispatch:
 
 jobs:
-  run-automation:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Python
+      - uses: actions/checkout@v3
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      # Yahan se libgconf-2-4 hata diya gaya hai
-      - name: Install System Dependencies for Headless Browser
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb x11-utils 
-
-      - name: Install Python Packages
-        run: |
-          pip install requests beautifulsoup4 undetected-chromedriver selenium google-generativeai pillow
-
-      - name: Run Python Script with Virtual Screen (Xvfb)
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run Script
         env:
-          GUMROAD_TOKEN: ${{ secrets.GUMROAD_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" python bot.py
-
-      - name: Upload Screenshots
-        uses: actions/upload-artifact@v4
-        if: always() 
-        with:
-          name: screenshot
-          path: screenshot/
-          retention-days: 3
-          
-      - name: Save History to GitHub
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-          git add last_post.txt
-          git commit -m "Auto-update book history" || echo "No changes to commit"
-          git push
+          GUMROAD_TOKEN: ${{ secrets.GUMROAD_TOKEN }}
+        run: python main.py
