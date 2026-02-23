@@ -1,21 +1,32 @@
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import random
+import urllib.parse
 import requests
 import glob
 import google.generativeai as genai
 from PIL import Image
 
-# Download folder setup
+# --- Folders Setup ---
 DOWNLOAD_DIR = os.path.abspath("downloads")
-if not os.path.exists(DOWNLOAD_DIR):
-    os.makedirs(DOWNLOAD_DIR)
+SCREENSHOT_DIR = os.path.abspath("screenshot") # Naya Screenshot Folder
 
-# Configure Gemini API
+if not os.path.exists(DOWNLOAD_DIR): os.makedirs(DOWNLOAD_DIR)
+if not os.path.exists(SCREENSHOT_DIR): os.makedirs(SCREENSHOT_DIR)
+
+# Gemini API Setup
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+def take_screenshot(driver, name):
+    """Helper function to save screenshots directly into the screenshot folder"""
+    filepath = os.path.join(SCREENSHOT_DIR, f"{name}.png")
+    driver.save_screenshot(filepath)
+    print(f"Screenshot saved: {name}.png")
 
 def setup_browser():
     print("Browser start ho raha hai...")
@@ -23,21 +34,22 @@ def setup_browser():
     options.add_experimental_option("prefs", {
         "download.default_directory": DOWNLOAD_DIR,
         "download.prompt_for_download": False,
-        "plugins.always_open_pdf_externally": True
+        "plugins.always_open_pdf_externally": True,
+        "profile.default_content_setting_values.notifications": 2
     })
-    
-    # FIX: Yahan 'version_main=144' add kiya gaya hai taaki version match ho sake
-    driver = uc.Chrome(options=options, version_main=144) 
-    
+    driver = uc.Chrome(options=options, version_main=144)
     driver.set_window_size(1280, 800)
     return driver
 
 def bypass_cloudflare_and_get_book(driver, history):
     base_url = "https://welib.st"
+    print(f"Opening {base_url}...")
     driver.get(base_url)
-    time.sleep(12) 
     
-    # 1. Verification Bypass
+    time.sleep(12) 
+    take_screenshot(driver, "1_initial_page_load") # Screenshot 1
+
+    # --- Cloudflare Bypass ---
     try:
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         for iframe in iframes:
@@ -46,159 +58,130 @@ def bypass_cloudflare_and_get_book(driver, history):
                 cb = driver.find_element(By.CSS_SELECTOR, ".ctp-checkbox-label, input[type='checkbox']")
                 cb.click()
                 print("Cloudflare checkbox clicked!")
-                time.sleep(8)
+                time.sleep(10)
+                driver.switch_to.default_content()
                 break
-            except: pass
-            finally: driver.switch_to.default_content()
-    except: pass
+            except:
+                driver.switch_to.default_content()
+    except:
+        pass
 
-    # Screenshot 1: Home Page load hone ke baad
-    driver.save_screenshot("step1_homepage.png") 
+    take_screenshot(driver, "2_after_cloudflare_check") # Screenshot 2
 
-    # 2. Category Section 'Dekhna'
-    print("Categories dhoondhne ke liye niche dekh rahe hain...")
-    driver.execute_script("window.scrollBy(0, 1000);")
-    time.sleep(3)
-    driver.save_screenshot("step2_categories.png")
+    # --- Scroll & Categories ---
+    for _ in range(3):
+        driver.execute_script("window.scrollBy(0, 700);")
+        time.sleep(2)
+    
+    take_screenshot(driver, "3_scrolled_to_categories") # Screenshot 3
 
     try:
-        # Category links ko visual elements ki tarah select karna
-        categories = driver.find_elements(By.XPATH, "//a[contains(@href, '/category/') or contains(@href, '/topic/')]")
-        if categories:
-            choice = random.choice(categories)
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", choice)
-            time.sleep(2)
-            choice.click()
-            print("Category par click kiya!")
-            time.sleep(7)
-            driver.save_screenshot("step3_category_page.png")
-    except Exception as e:
-        print(f"Visual selection failed: {e}")
+        cat_links = driver.find_elements(By.XPATH, "//a[contains(@href, '/category/') or contains(@href, '/topic/')]")
+        if not cat_links:
+             cat_links = driver.find_elements(By.CSS_SELECTOR, ".card a")
 
-    # 3. Book Selection (MD5 visual pattern)
+        if cat_links:
+            random_cat = random.choice(cat_links)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", random_cat)
+            time.sleep(1)
+            random_cat.click()
+            time.sleep(8)
+            take_screenshot(driver, "4_category_page_opened") # Screenshot 4
+    except Exception as e:
+        print(f"Category selection error: {e}")
+
+    # --- Book Selection ---
+    driver.execute_script("window.scrollBy(0, 500);")
+    time.sleep(3)
+    take_screenshot(driver, "5_looking_for_books") # Screenshot 5
+
     links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
     book_urls = [link.get_attribute('href') for link in links if link.get_attribute('href')]
+    available_books = list(set([u for u in book_urls if u not in history]))
     
-    available = list(set([u for u in book_urls if u not in history]))
-    
-    if not available:
-        print("Koi nayi book nahi dikhi!")
+    if not available_books:
+        print("Koi nayi book nahi mili.")
+        take_screenshot(driver, "error_no_books_found")
         return None
         
-    selected_book = random.choice(available)
-    print(f"Book select ki: {selected_book}")
+    selected_book = random.choice(available_books)
     driver.get(selected_book)
-    time.sleep(5)
-    driver.save_screenshot("step4_book_detail.png")
+    time.sleep(8) 
+    take_screenshot(driver, "6_book_detail_page") # Screenshot 6
     
     return selected_book
-    
-def simulate_mouse_copy(driver):
-    print("Simulating mouse movement...")
+
+def extract_book_details(driver):
     actions = ActionChains(driver)
-    
     try:
         title_el = driver.find_element(By.TAG_NAME, "h1")
-        actions.move_to_element(title_el).pause(1).double_click().perform()
-        time.sleep(1)
+        actions.move_to_element(title_el).pause(0.5).perform()
         original_title = title_el.text
-    except:
-        original_title = "Premium Book Edition"
+    except: original_title = "Unknown Title"
 
     try:
-        desc_el = driver.find_element(By.CSS_SELECTOR, "h1 + div, h1 + p, .description")
-        actions.move_to_element(desc_el).pause(1).click().perform()
-        time.sleep(1)
+        desc_el = driver.find_element(By.CSS_SELECTOR, "h1 ~ div.description, h1 ~ div, h1 ~ p")
+        actions.move_to_element(desc_el).pause(0.5).perform()
         original_desc = desc_el.text
-    except:
-        original_desc = "An amazing read for modern thinkers. Grab your copy now."
+    except: original_desc = "A profound read recommended for you."
         
     try:
         img_el = driver.find_element(By.CSS_SELECTOR, "img.cover, .book-cover img")
-        img_url = img_el.get_attribute('src')
-        img_data = requests.get(img_url).content
-        with open("original_cover.jpg", "wb") as f:
-            f.write(img_data)
-    except:
-        print("Original image download fail hua.")
+        img_data = requests.get(img_el.get_attribute('src'), headers={"User-Agent": "Mozilla/5.0"}).content
+        with open("original_cover.jpg", "wb") as f: f.write(img_data)
+    except: pass
         
     return original_title, original_desc
 
-def download_pdf(driver):
-    print("Clicking PDF Download button...")
+def download_book_file(driver):
     try:
-        btn = driver.find_element(By.XPATH, "//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download') or contains(text(), 'PDF')]")
-        actions = ActionChains(driver)
-        actions.move_to_element(btn).pause(1).click().perform()
-        time.sleep(30) 
+        download_btns = driver.find_elements(By.XPATH, "//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download')]")
+        for btn in download_btns:
+            if btn.is_displayed():
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                time.sleep(1)
+                ActionChains(driver).move_to_element(btn).pause(0.5).click().perform()
+                break
         
-        files = glob.glob(f'{DOWNLOAD_DIR}/*.pdf')
-        if files:
-            return max(files, key=os.path.getctime)
-    except Exception as e:
-        print(f"Download button error: {e}")
+        take_screenshot(driver, "7_clicked_download") # Screenshot 7
+        time.sleep(60) 
+        
+        files = glob.glob(f'{DOWNLOAD_DIR}/*.*')
+        if files: return max(files, key=os.path.getctime)
+    except: pass
     return None
 
-def generate_gemini_text(title, desc):
-    print("Generating AI Text via Gemini...")
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    prompt = f"""Act as a professional copywriter. Book: '{title}'. Original Description: {desc}. 
-Task 1: Generate a COMPLETELY NEW, catchy title in the same genre. 
-Task 2: Write a 100% humanized, engaging product description to sell this ebook. 
-Format strictly as:
-Title: [New Title Here]
-Description: [New Description Here]"""
-    
+def process_with_gemini(title, desc):
+    # Text Generation
     try:
-        response = model.generate_content(prompt)
-        text = response.text
-        new_title = title
-        new_desc = text
-        if "Title:" in text and "Description:" in text:
-            parts = text.split("Description:")
-            new_title = parts[0].replace("Title:", "").strip()
-            new_desc = parts[1].strip()
-        return new_title, new_desc
-    except Exception as e:
-        print(f"Gemini Text Error: {e}")
-        return title, desc
-
-def generate_gemini_image(original_img_path):
-    print("Analyzing original cover and generating new image via Gemini...")
-    try:
-        if not os.path.exists(original_img_path):
-            return "original_cover.jpg"
-
-        # Step 1: Analyze the original image
-        img = Image.open(original_img_path)
-        vision_model = genai.GenerativeModel('gemini-1.5-flash')
-        analysis_prompt = """Analyze this book cover. Identify the genre, tone, and visual symbolism. 
-Then, write a highly detailed text-to-image prompt to create a completely NEW, minimal, professional 3D ebook cover for the same genre. 
-Make sure the prompt specifies a clean layout, a strong central visual metaphor, and NO text or words in the image."""
+        text_model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = f"Act as a professional book marketer.\nOriginal Title: '{title}'\nOriginal Description: '{desc}'\nTask 1: Create a NEW, catchy title for this book.\nTask 2: Write a compelling, humanized description to sell it.\nFormat Output exactly like this:\nNEW_TITLE: [Your Title Here]\nNEW_DESC: [Your Description Here]"
+        resp = text_model.generate_content(prompt).text
         
-        analysis_response = vision_model.generate_content([analysis_prompt, img])
-        image_prompt = analysis_response.text
-        print("Generated Image Prompt from Gemini:\n", image_prompt)
+        new_title, new_desc = title, desc
+        for line in resp.split('\n'):
+            if line.startswith("NEW_TITLE:"): new_title = line.replace("NEW_TITLE:", "").strip()
+            elif line.startswith("NEW_DESC:"): new_desc = line.replace("NEW_DESC:", "").strip()
+    except: new_title, new_desc = title, desc
 
-        # Step 2: Generate the new image using Google's Imagen via SDK
-        # Note: 'imagen-3.0-generate-001' is the standard model for image generation in Gemini API
-        result = genai.ImageGenerationModel("imagen-3.0-generate-001").generate_images(
-            prompt=image_prompt,
-            number_of_images=1,
-            aspect_ratio="1:1"
-        )
-        
-        for generated_image in result.images:
-            generated_image.save("final_cover.jpg")
-            return "final_cover.jpg"
+    # Image Generation
+    cover_path = "original_cover.jpg"
+    if os.path.exists("original_cover.jpg"):
+        try:
+            img_model = genai.GenerativeModel('gemini-1.5-flash')
+            img_file = Image.open("original_cover.jpg")
+            vision_prompt = "Analyze the genre and theme of this book cover. Then create a prompt for a completely new, professional, minimalist 3D ebook cover for the same genre. Do not use any text in the new image prompt."
+            image_prompt = img_model.generate_content([vision_prompt, img_file]).text
             
-    except Exception as e:
-        print(f"Gemini Image Error: {e}")
-    
-    return "original_cover.jpg" # Fallback
+            imagen_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+            result = imagen_model.generate_images(prompt=image_prompt, number_of_images=1, aspect_ratio="1:1")
+            result.images[0].save("final_cover.jpg")
+            cover_path = "final_cover.jpg"
+        except: pass
 
-def upload_gumroad(title, desc, pdf_path, cover_path):
-    print("Uploading to Gumroad...")
+    return new_title, new_desc, cover_path
+
+def upload_to_gumroad(title, desc, file_path, cover_path):
     url = "https://api.gumroad.com/v2/products"
     data = {
         "access_token": os.getenv("GUMROAD_TOKEN"),
@@ -206,53 +189,41 @@ def upload_gumroad(title, desc, pdf_path, cover_path):
         "description": desc,
         "price": 0
     }
-    
-    # Fallback checking
-    if not os.path.exists(cover_path):
-        with open("dummy_cover.jpg", "w") as f: f.write("dummy")
-        cover_path = "dummy_cover.jpg"
-
-    with open(pdf_path, 'rb') as pdf, open(cover_path, 'rb') as cover:
-        files = {'file': pdf, 'preview': cover}
-        res = requests.post(url, data=data, files=files)
-        
-    if res.status_code in [200, 201]:
-        print("Gumroad par successfully publish ho gaya!")
-    else:
-        print("Gumroad Error:", res.text)
+    try:
+        with open(file_path, 'rb') as f, open(cover_path, 'rb') as c:
+            files = {'file': f, 'preview': c}
+            res = requests.post(url, data=data, files=files)
+            if res.status_code in [200, 201]: return True
+    except: pass
+    return False
 
 def main():
     history_file = "last_post.txt"
     history = []
     if os.path.exists(history_file):
-        with open(history_file, "r") as f:
-            history = f.read().splitlines()
+        with open(history_file, "r") as f: history = f.read().splitlines()
 
     driver = setup_browser()
     try:
         book_url = bypass_cloudflare_and_get_book(driver, history)
         if not book_url: return
         
-        orig_title, orig_desc = simulate_mouse_copy(driver)
-        pdf_path = download_pdf(driver)
+        orig_title, orig_desc = extract_book_details(driver)
+        downloaded_file = download_book_file(driver)
+        if not downloaded_file: return
+
+        new_title, new_desc, final_cover = process_with_gemini(orig_title, orig_desc)
+        success = upload_to_gumroad(new_title, new_desc, downloaded_file, final_cover)
         
-        if not pdf_path:
-            print("PDF Download fail ho gaya. Exiting.")
-            return
-            
-        new_title, new_desc = generate_gemini_text(orig_title, orig_desc)
-        final_cover = generate_gemini_image("original_cover.jpg")
-        
-        upload_gumroad(new_title, new_desc, pdf_path, final_cover)
-        
-        with open(history_file, "a") as f:
-            f.write(book_url + "\n")
-            
+        if success:
+            with open(history_file, "a") as f: f.write(book_url + "\n")
+
     finally:
         driver.quit()
         for f in glob.glob(f'{DOWNLOAD_DIR}/*'): os.remove(f)
-        for img in ["original_cover.jpg", "final_cover.jpg", "dummy_cover.jpg"]:
-            if os.path.exists(img): os.remove(img)
+        if os.path.exists("original_cover.jpg"): os.remove("original_cover.jpg")
+        if os.path.exists("final_cover.jpg"): os.remove("final_cover.jpg")
+        # Note: 'screenshot' folder ko delete nahi kiya hai, taaki GitHub use upload kar sake.
 
 if __name__ == "__main__":
     main()
