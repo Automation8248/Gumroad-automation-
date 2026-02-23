@@ -33,10 +33,7 @@ jobs:
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" python bot.py
 
-      - name: Save History to GitHub
+      - name: Install System Dependencies for Headless Browser
         run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-          git add last_post.txt
-          git commit -m "Auto-update book history" || echo "No changes to commit"
-          git push
+          sudo apt-get update
+          sudo apt-get install -y xvfb x11-utils
