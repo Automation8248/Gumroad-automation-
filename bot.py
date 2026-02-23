@@ -45,51 +45,50 @@ def bypass_cloudflare_and_get_book(driver, history):
     print(f"Opening {base_url}...")
     driver.get(base_url)
     
-    # 1. Verification page load hone ka wait
-    time.sleep(12) 
-    take_screenshot(driver, "1_verification_page_check")
+    # 1. Page load hone ka initial wait
+    time.sleep(7) 
+    take_screenshot(driver, "1_initial_verification_page")
 
-    # --- CLOUDFLARE TICK LOGIC ---
-    print("Cloudflare verification box dhoondh rahe hain...")
+    # --- FINAL CLOUDFLARE TICK LOGIC ---
+    print("Cloudflare verification box par TICK karne ki koshish...")
     
     try:
-        # Step A: Saare iframes ko scan karna
+        # Step A: Pehle check karein agar 'Verify' text dikh raha hai
+        # Step B: Iframe dhoondhna jo checkbox contain karta hai
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        print(f"Total {len(iframes)} iframes mile.")
-
+        
         for index, iframe in enumerate(iframes):
             try:
-                # Mouse ko iframe (box) ke bilkul center par le jana
-                # 'actions.move_to_element' mouse cursor ko wahan physically le jata hai
+                # Mouse Action: Iframe ke bilkul center par click karna
                 actions = ActionChains(driver)
                 
-                # Step B: Box par mouse le jana aur 2 second rukna (Human simulation)
-                actions.move_to_element(iframe).pause(2)
+                # Box ke upar mouse le jana aur 6 second wait karna (Human-like)
+                actions.move_to_element(iframe).pause(6)
                 
-                # Step C: Box par TIK (Click) karna
+                # Box par physical click (TICK) karna
                 actions.click().perform()
                 
-                print(f"Iframe #{index} par Mouse se TICK kar diya!")
+                print(f"Checkbox par TICK kar diya gaya hai (Iframe #{index})")
                 
-                # Step D: Tick karne ke baad redirect ka wait karna
-                print("Tick ho gaya. Ab 15 seconds wait kar rahe hain redirect ke liye...")
-                time.sleep(15)
+                # Step C: Tick karne ke baad 7 second wait karna redirect ke liye
+                print("TICK ke baad 7 seconds wait kar rahe hain...")
+                time.sleep(7)
                 
-                # Agar redirect ho gaya toh homepage dikhna chahiye
+                # Agar website redirect ho gayi, toh current URL change ho jayega
                 if "welib.st" in driver.current_url and len(driver.current_url) < 30:
-                    print("Successfully redirect ho gaya!")
+                    print("Redirect successful!")
                     break
-            except Exception as e:
+            except:
                 continue
-                
     except Exception as e:
-        print(f"Cloudflare logic fail: {e}")
+        print(f"Verification logic error: {e}")
     
-    # Screenshot check karne ke liye ki tick hua ya nahi
-    take_screenshot(driver, "2_after_cloudflare_tick_attempt")
-    
-    # --- Category aur Book Selection ka aage ka process ---
-    # (Baki code purana hi rahega)
+    # Check karne ke liye ki tick hua ya nahi
+    take_screenshot(driver, "2_post_tick_check")
+
+    # --- Step 2: Random Book Selection ---
+    print("Ab randomly categories aur books dhoondh rahe hain...")
+    # ... baki ka navigation logic yahan aayega ...
 
     # --- Scroll & Categories ---
     for _ in range(3):
