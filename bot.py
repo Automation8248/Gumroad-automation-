@@ -41,33 +41,34 @@ def setup_browser():
     driver.set_window_size(1280, 800)
     return driver
 
-def bypass_cloudflare_and_get_book(driver, history):
-    base_url = "https://welib.st"
-    print(f"Opening {base_url}...")
-    driver.get(base_url)
+# --- Cloudflare Bypass ---
+    print("Cloudflare check kar rahe hain...")
+    time.sleep(10) # Box ko poori tarah screen par aane dene ke liye wait
     
-    time.sleep(12) 
-    take_screenshot(driver, "1_initial_page_load") # Screenshot 1
-
-    # --- Cloudflare Bypass ---
     try:
+        # Page par jitne bhi iframe (box) hain, unhe dhoondhna
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
+        
         for iframe in iframes:
-            driver.switch_to.frame(iframe)
             try:
-                cb = driver.find_element(By.CSS_SELECTOR, ".ctp-checkbox-label, input[type='checkbox']")
-                cb.click()
-                print("Cloudflare checkbox clicked!")
-                time.sleep(10)
-                driver.switch_to.default_content()
-                break
-            except:
-                driver.switch_to.default_content()
-    except:
-        pass
-
+                # 1. Mouse ko seedha iframe (box) ke upar le jaana
+                # 2. Ek second rukna (Human behavior)
+                # 3. Click kar dena
+                actions = ActionChains(driver)
+                actions.move_to_element(iframe).pause(1.5).click().perform()
+                
+                print("Mouse se Cloudflare box par click kar diya!")
+                time.sleep(10) # Click ke baad verify hone ka wait
+                
+                # Agar ek par click ho gaya, toh loop se bahar aa jao
+                break 
+            except Exception as e:
+                pass
+    except Exception as e:
+        print(f"Cloudflare check error: {e}")
+    
     take_screenshot(driver, "2_after_cloudflare_check") # Screenshot 2
-
+    # -------------------------
     # --- Scroll & Categories ---
     for _ in range(3):
         driver.execute_script("window.scrollBy(0, 700);")
