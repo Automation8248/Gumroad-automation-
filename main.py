@@ -23,11 +23,11 @@ doc.save(new_pdf_path)
 
 # 3. Naye package se Title aur Description Likhwana
 title_prompt = f"Analyze this ebook text and give a catchy 3-5 word title. Text: {pdf_text[:3000]}"
-title_response = client.models.generate_content(model='gemini-1.5-flash', contents=title_prompt)
+title_response = client.models.generate_content(model='gemini-pro', contents=title_prompt)
 title = title_response.text.replace("*", "").replace("#", "").strip()
 
 desc_prompt = f"Analyze this text and write a short Gumroad sales description for this ebook. STRICTLY DO NOT use any * or # symbols. Text: {pdf_text[:3000]}"
-desc_response = client.models.generate_content(model='gemini-1.5-flash', contents=desc_prompt)
+desc_response = client.models.generate_content(model='gemini-pro', contents=desc_prompt)
 description = desc_response.text.replace("*", "").replace("#", "").strip()
 
 # 4. AI Cover Generate & Download (Bina request library)
