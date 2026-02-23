@@ -45,28 +45,51 @@ def bypass_cloudflare_and_get_book(driver, history):
     print(f"Opening {base_url}...")
     driver.get(base_url)
     
+    # 1. Verification page load hone ka wait
     time.sleep(12) 
-    take_screenshot(driver, "1_initial_page_load")
+    take_screenshot(driver, "1_verification_page_check")
 
-    # --- Cloudflare Bypass (Mouse Center Click) ---
-    print("Cloudflare check kar rahe hain...")
-    time.sleep(10)
+    # --- CLOUDFLARE TICK LOGIC ---
+    print("Cloudflare verification box dhoondh rahe hain...")
     
     try:
+        # Step A: Saare iframes ko scan karna
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        for iframe in iframes:
+        print(f"Total {len(iframes)} iframes mile.")
+
+        for index, iframe in enumerate(iframes):
             try:
+                # Mouse ko iframe (box) ke bilkul center par le jana
+                # 'actions.move_to_element' mouse cursor ko wahan physically le jata hai
                 actions = ActionChains(driver)
-                actions.move_to_element(iframe).pause(2).click().perform()
-                print("Mouse se Cloudflare box ke center par click kar diya!")
-                time.sleep(10)
-                break 
-            except:
+                
+                # Step B: Box par mouse le jana aur 2 second rukna (Human simulation)
+                actions.move_to_element(iframe).pause(2)
+                
+                # Step C: Box par TIK (Click) karna
+                actions.click().perform()
+                
+                print(f"Iframe #{index} par Mouse se TICK kar diya!")
+                
+                # Step D: Tick karne ke baad redirect ka wait karna
+                print("Tick ho gaya. Ab 15 seconds wait kar rahe hain redirect ke liye...")
+                time.sleep(15)
+                
+                # Agar redirect ho gaya toh homepage dikhna chahiye
+                if "welib.st" in driver.current_url and len(driver.current_url) < 30:
+                    print("Successfully redirect ho gaya!")
+                    break
+            except Exception as e:
                 continue
+                
     except Exception as e:
-        print(f"Cloudflare interaction error: {e}")
+        print(f"Cloudflare logic fail: {e}")
     
-    take_screenshot(driver, "2_after_cloudflare_click")
+    # Screenshot check karne ke liye ki tick hua ya nahi
+    take_screenshot(driver, "2_after_cloudflare_tick_attempt")
+    
+    # --- Category aur Book Selection ka aage ka process ---
+    # (Baki code purana hi rahega)
 
     # --- Scroll & Categories ---
     for _ in range(3):
