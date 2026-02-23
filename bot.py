@@ -25,7 +25,10 @@ def setup_browser():
         "download.prompt_for_download": False,
         "plugins.always_open_pdf_externally": True
     })
-    driver = uc.Chrome(options=options)
+    
+    # FIX: Yahan 'version_main=144' add kiya gaya hai taaki version match ho sake
+    driver = uc.Chrome(options=options, version_main=144) 
+    
     driver.set_window_size(1280, 800)
     return driver
 
