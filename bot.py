@@ -14,7 +14,7 @@ from PIL import Image
 
 # --- Folders Setup ---
 DOWNLOAD_DIR = os.path.abspath("downloads")
-SCREENSHOT_DIR = os.path.abspath("screenshot") # Naya Screenshot Folder
+SCREENSHOT_DIR = os.path.abspath("screenshot") # Screenshot Folder
 
 if not os.path.exists(DOWNLOAD_DIR): os.makedirs(DOWNLOAD_DIR)
 if not os.path.exists(SCREENSHOT_DIR): os.makedirs(SCREENSHOT_DIR)
@@ -23,7 +23,6 @@ if not os.path.exists(SCREENSHOT_DIR): os.makedirs(SCREENSHOT_DIR)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def take_screenshot(driver, name):
-    """Helper function to save screenshots directly into the screenshot folder"""
     filepath = os.path.join(SCREENSHOT_DIR, f"{name}.png")
     driver.save_screenshot(filepath)
     print(f"Screenshot saved: {name}.png")
@@ -41,40 +40,40 @@ def setup_browser():
     driver.set_window_size(1280, 800)
     return driver
 
-# --- Cloudflare Bypass ---
+def bypass_cloudflare_and_get_book(driver, history):
+    base_url = "https://welib.st"
+    print(f"Opening {base_url}...")
+    driver.get(base_url)
+    
+    time.sleep(12) 
+    take_screenshot(driver, "1_initial_page_load")
+
+    # --- Cloudflare Bypass (Mouse Center Click) ---
     print("Cloudflare check kar rahe hain...")
-    time.sleep(10) # Box ko poori tarah screen par aane dene ke liye wait
+    time.sleep(10)
     
     try:
-        # Page par jitne bhi iframe (box) hain, unhe dhoondhna
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        
         for iframe in iframes:
             try:
-                # 1. Mouse ko seedha iframe (box) ke upar le jaana
-                # 2. Ek second rukna (Human behavior)
-                # 3. Click kar dena
                 actions = ActionChains(driver)
-                actions.move_to_element(iframe).pause(1.5).click().perform()
-                
-                print("Mouse se Cloudflare box par click kar diya!")
-                time.sleep(10) # Click ke baad verify hone ka wait
-                
-                # Agar ek par click ho gaya, toh loop se bahar aa jao
+                actions.move_to_element(iframe).pause(2).click().perform()
+                print("Mouse se Cloudflare box ke center par click kar diya!")
+                time.sleep(10)
                 break 
-            except Exception as e:
-                pass
+            except:
+                continue
     except Exception as e:
-        print(f"Cloudflare check error: {e}")
+        print(f"Cloudflare interaction error: {e}")
     
-    take_screenshot(driver, "2_after_cloudflare_check") # Screenshot 2
-    # -------------------------
+    take_screenshot(driver, "2_after_cloudflare_click")
+
     # --- Scroll & Categories ---
     for _ in range(3):
         driver.execute_script("window.scrollBy(0, 700);")
         time.sleep(2)
     
-    take_screenshot(driver, "3_scrolled_to_categories") # Screenshot 3
+    take_screenshot(driver, "3_scrolled_to_categories")
 
     try:
         cat_links = driver.find_elements(By.XPATH, "//a[contains(@href, '/category/') or contains(@href, '/topic/')]")
@@ -87,14 +86,14 @@ def setup_browser():
             time.sleep(1)
             random_cat.click()
             time.sleep(8)
-            take_screenshot(driver, "4_category_page_opened") # Screenshot 4
+            take_screenshot(driver, "4_category_page_opened")
     except Exception as e:
         print(f"Category selection error: {e}")
 
     # --- Book Selection ---
     driver.execute_script("window.scrollBy(0, 500);")
     time.sleep(3)
-    take_screenshot(driver, "5_looking_for_books") # Screenshot 5
+    take_screenshot(driver, "5_looking_for_books")
 
     links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
     book_urls = [link.get_attribute('href') for link in links if link.get_attribute('href')]
@@ -108,7 +107,7 @@ def setup_browser():
     selected_book = random.choice(available_books)
     driver.get(selected_book)
     time.sleep(8) 
-    take_screenshot(driver, "6_book_detail_page") # Screenshot 6
+    take_screenshot(driver, "6_book_detail_page")
     
     return selected_book
 
@@ -144,7 +143,7 @@ def download_book_file(driver):
                 ActionChains(driver).move_to_element(btn).pause(0.5).click().perform()
                 break
         
-        take_screenshot(driver, "7_clicked_download") # Screenshot 7
+        take_screenshot(driver, "7_clicked_download")
         time.sleep(60) 
         
         files = glob.glob(f'{DOWNLOAD_DIR}/*.*')
@@ -153,7 +152,6 @@ def download_book_file(driver):
     return None
 
 def process_with_gemini(title, desc):
-    # Text Generation
     try:
         text_model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"Act as a professional book marketer.\nOriginal Title: '{title}'\nOriginal Description: '{desc}'\nTask 1: Create a NEW, catchy title for this book.\nTask 2: Write a compelling, humanized description to sell it.\nFormat Output exactly like this:\nNEW_TITLE: [Your Title Here]\nNEW_DESC: [Your Description Here]"
@@ -165,7 +163,6 @@ def process_with_gemini(title, desc):
             elif line.startswith("NEW_DESC:"): new_desc = line.replace("NEW_DESC:", "").strip()
     except: new_title, new_desc = title, desc
 
-    # Image Generation
     cover_path = "original_cover.jpg"
     if os.path.exists("original_cover.jpg"):
         try:
@@ -224,7 +221,6 @@ def main():
         for f in glob.glob(f'{DOWNLOAD_DIR}/*'): os.remove(f)
         if os.path.exists("original_cover.jpg"): os.remove("original_cover.jpg")
         if os.path.exists("final_cover.jpg"): os.remove("final_cover.jpg")
-        # Note: 'screenshot' folder ko delete nahi kiya hai, taaki GitHub use upload kar sake.
 
 if __name__ == "__main__":
     main()
