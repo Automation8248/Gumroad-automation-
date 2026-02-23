@@ -34,8 +34,11 @@ def setup_browser():
 
 def bypass_cloudflare_and_get_book(driver, history):
     base_url = "https://welib.st"
+    print("Website open kar rahe hain...")
     driver.get(base_url)
-    time.sleep(5)
+    
+    # Cloudflare check ke liye wait
+    time.sleep(10) 
     
     try:
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
@@ -45,7 +48,7 @@ def bypass_cloudflare_and_get_book(driver, history):
                 cb = driver.find_element(By.CSS_SELECTOR, ".ctp-checkbox-label, input[type='checkbox']")
                 cb.click()
                 print("Cloudflare checkbox clicked!")
-                time.sleep(4)
+                time.sleep(8)
                 break
             except:
                 pass
@@ -54,23 +57,34 @@ def bypass_cloudflare_and_get_book(driver, history):
     except:
         pass
 
-    time.sleep(3)
+    print("Books dhoondh rahe hain...")
+    time.sleep(5)
     
-    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/book/'], a.book-link, .card a")
-    book_urls = [link.get_attribute('href') for link in links if link.get_attribute('href')]
+    # FIX: Screenshot ke anusaar, book pages ke URL mein hamesha '/md5/' hota hai.
+    # Hum sirf wahi links nikalenge jisme '/md5/' ho.
+    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
+    book_urls = []
+    
+    for link in links:
+        href = link.get_attribute('href')
+        if href:
+            book_urls.append(href)
+            
     available_books = list(set([u for u in book_urls if u not in history]))
     
     if not available_books:
-        print("Koi nayi book nahi mili!")
+        print("Koi nayi book nahi mili! (URL /md5/ match nahi hua)")
         return None
         
     selected_book = random.choice(available_books)
     print(f"Random Book Selected: {selected_book}")
+    
+    # Book ke detail page par jaana
     driver.get(selected_book)
-    time.sleep(4)
+    time.sleep(6) # Page fully load hone ka wait
     
     return selected_book
-
+    
 def simulate_mouse_copy(driver):
     print("Simulating mouse movement...")
     actions = ActionChains(driver)
