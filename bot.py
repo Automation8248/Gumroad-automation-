@@ -38,8 +38,9 @@ def bypass_cloudflare_and_get_book(driver, history):
     driver.get(base_url)
     
     # Cloudflare check ke liye wait
-    time.sleep(10) 
+    time.sleep(12) 
     
+    # 1. Cloudflare Bypass Logic (Checkbox click)
     try:
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         for iframe in iframes:
@@ -57,44 +58,58 @@ def bypass_cloudflare_and_get_book(driver, history):
     except:
         pass
 
-    # IMPORTANT: Page ko thoda scroll karenge taaki hidden books load ho jayein
-    print("Page scroll kar rahe hain taaki saari books load ho jayein...")
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/3);")
-    time.sleep(5)
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-    time.sleep(5)
+    # 2. Scrolling to Categories Section
+    print("Category section dhoondhne ke liye scroll kar rahe hain...")
+    for _ in range(3):
+        driver.execute_script("window.scrollBy(0, 800);")
+        time.sleep(2)
 
-    print("Books dhoondh rahe hain...")
+    # 3. Category Select Karna
+    try:
+        print("Kisi random category par click kar rahe hain...")
+        # Screenshot ke hisaab se categories 'a' tags mein hoti hain jinme category ka naam hota hai
+        # Hum un links ko dhoondhenge jinme '/category/' ya similar pattern ho
+        category_links = driver.find_elements(By.XPATH, "//a[contains(@href, '/category/') or contains(@href, '/topic/')]")
+        
+        if not category_links:
+            # Fallback: Agar category link nahi mili toh homepage ki kisi bhi topic link par click karein
+            category_links = driver.find_elements(By.CSS_SELECTOR, ".card a, .category-item a")
+
+        if category_links:
+            random_cat = random.choice(category_links)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", random_cat)
+            time.sleep(2)
+            random_cat.click()
+            print("Category select ho gayi. Naya page load ho raha hai...")
+            time.sleep(7)
+        else:
+            print("Directly books scan kar rahe hain...")
+    except Exception as e:
+        print(f"Category click karne mein error: {e}")
+
+    # 4. Book Select Karna (MD5 Pattern)
+    print("Ab category ke andar se book dhoondh rahe hain...")
+    driver.execute_script("window.scrollBy(0, 500);")
+    time.sleep(3)
     
-    # Page par jitne bhi 'a' (links) tags hain sab utha lenge
-    links = driver.find_elements(By.TAG_NAME, "a")
-    print(f"Total links found on page: {len(links)}")
-    
-    book_urls = []
-    for link in links:
-        try:
-            href = link.get_attribute('href')
-            if href and base_url in href:
-                # Faltu links ko ignore karenge
-                if "search" not in href and "donate" not in href and "login" not in href and "account" not in href:
-                    # Book ki links hamesha lambi hoti hain (jaise md5 hash), isliye 40 char se badi links ko lenge
-                    if len(href) > 40 or '/md5/' in href:
-                        book_urls.append(href)
-        except:
-            pass
-            
-    # Duplicate links ko hata denge
-    book_urls = list(set(book_urls))
-    print(f"Filtered Book Links ki ginti: {len(book_urls)}")
+    # WeLib mein books ka URL hamesha '/md5/' se identify hota hai
+    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/md5/']")
+    book_urls = [link.get_attribute('href') for link in links if link.get_attribute('href')]
     
     available_books = list(set([u for u in book_urls if u not in history]))
     
     if not available_books:
-        print("Koi nayi book nahi mili! Debug ke liye saari links print kar rahe hain:")
-        # Agar koi book na mile toh log mein show karega ki kya kya mila tha
-        for u in book_urls:
-            print("Found URL:", u)
+        print("Is category mein koi nayi book nahi mili. Homepage fallback use kar rahe hain...")
+        # Dobara homepage se try karega agar category fail hui
         return None
+        
+    selected_book = random.choice(available_books)
+    print(f"Random Book Selected: {selected_book}")
+    
+    driver.get(selected_book)
+    time.sleep(8) 
+    
+    return selected_book
         
     selected_book = random.choice(available_books)
     print(f"Random Book Selected: {selected_book}")
