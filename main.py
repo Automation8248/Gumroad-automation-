@@ -24,22 +24,29 @@ title_url = f"https://text.pollinations.ai/{urllib.parse.quote('1 short catchy t
 
 req = urllib.request.Request(title_url, headers=headers)
 with urllib.request.urlopen(req) as res:
-    title = res.read().decode('utf-8').strip()[:40] # Title length limit fix
+    title = res.read().decode('utf-8').replace('"', '').strip()[:40]
 
-# 4. Final LIVE Upload Command
+# 4. Final LIVE Upload Command (Fixed Warnings)
 price = int(round(random.uniform(1.99, 4.00), 2) * 100)
+print(f"Bookvex is uploading: {title} at price cents {price}")
 
-print(f"Bookvex is uploading: {title}")
-
+# Sab kuch --form mein convert kar diya hai taaki warning na aaye
 upload_cmd = [
     "curl", "-X", "POST", "https://api.gumroad.com/v2/products",
-    "-d", f"access_token={os.environ['GUMROAD_TOKEN']}",
-    "-d", f"name={title}",
-    "-d", f"price={price}",
-    "-d", "published=true",
+    "--form", f"access_token={os.environ['GUMROAD_TOKEN']}",
+    "--form", f"name={title}",
+    "--form", f"price={price}",
+    "--form", "published=true",
     "--form", f"product[file]=@{pdf_path}",
     "--form", f"product[thumbnail]=@{cover_path}"
 ]
 
-subprocess.run(upload_cmd)
-print("Check your Gumroad Products now!")
+result = subprocess.run(upload_cmd, capture_output=True, text=True)
+
+# Debugging ke liye response print karega
+print("Gumroad API Response:", result.stdout)
+
+if "success\":true" in result.stdout.lower():
+    print("Mubarak ho! Product ab list ho gaya hai.")
+else:
+    print("Abhi bhi list nahi hua. Response check karein.")
