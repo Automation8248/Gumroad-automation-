@@ -1,4 +1,4 @@
-import os, random, subprocess, fitz, json
+import os, random, subprocess, fitz
 import urllib.request, urllib.parse
 
 # 1. Random PDF aur Category Selection
@@ -17,12 +17,12 @@ cover_path = os.path.abspath("screenshots/original_cover.jpg")
 pix.save(cover_path)
 doc.close()
 
-# Browser identity setup
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+# Identity setup
+headers = {'User-Agent': 'Mozilla/5.0'}
 
-# 3. Pollinations AI se Title aur Description (Clean Format)
+# 3. Pollinations AI se Title aur Description
 base_name = pdf_file.replace(".pdf", "").replace("_", " ").replace("-", " ")
-title_prompt = urllib.parse.quote(f"Give ONLY one catchy 3-word title for {base_name}. No numbers.")
+title_prompt = urllib.parse.quote(f"Give ONLY one 3-word title for {base_name}. No numbers.")
 title_url = f"https://text.pollinations.ai/{title_prompt}"
 
 req_title = urllib.request.Request(title_url, headers=headers)
@@ -30,39 +30,38 @@ with urllib.request.urlopen(req_title) as response:
     raw_title = response.read().decode('utf-8').split('\n')[0]
     title = "".join(filter(lambda x: not x.isdigit(), raw_title)).replace(".", "").strip()
 
-desc_prompt = urllib.parse.quote(f"Write a professional 1 sentence sales description for {title}. No symbols.")
+desc_prompt = urllib.parse.quote(f"Write a 1 sentence sales pitch for {title}. No symbols.")
 desc_url = f"https://text.pollinations.ai/{desc_prompt}"
 
 req_desc = urllib.request.Request(desc_url, headers=headers)
 with urllib.request.urlopen(req_desc) as response:
     description = response.read().decode('utf-8').replace("*", "").replace("#", "").strip()
 
-# 4. Price Set Karna ($1.99 to $4.00)
-price = round(random.uniform(1.99, 4.00), 2)
-price_in_cents = int(price * 100)
+# 4. Price Set Karna (Gumroad API 199 = $1.99)
+price_val = round(random.uniform(1.99, 4.00), 2)
+price_in_cents = int(price_val * 100)
 
-print(f"Starting Upload for: {title} at ${price}")
+print(f"Starting Final Attempt: {title} at ${price_val}")
 
-# 5. Gumroad API Call - Sabse Professional Tarika
-# Isme hum 'published=true' aur saari files ek saath bhej rahe hain
+# 5. Gumroad API Call (Simplified Method)
+# Is baar hum access_token ko sidha field mein bhej rahe hain
 upload_cmd = [
     "curl", "-s", "-X", "POST", "https://api.gumroad.com/v2/products",
-    "-H", f"Authorization: Bearer {os.environ['GUMROAD_TOKEN']}",
+    "-F", f"access_token={os.environ['GUMROAD_TOKEN']}",
     "-F", f"name={title}",
     "-F", f"price={price_in_cents}",
     "-F", f"description={description}",
-    "-F", "countries[]=ALL",
-    "-F", "is_physical=false",
-    "-F", "published=true", 
-    "-F", f"product[file]=@{pdf_path}",
-    "-F", f"product[thumbnail]=@{cover_path}"
+    "-F", "published=true",
+    "-F", f"file_url=@{pdf_path}",
+    "-F", f"thumbnail=@{cover_path}"
 ]
 
 result = subprocess.run(upload_cmd, capture_output=True, text=True)
 
-# 6. Result Check Karna
+# 6. Debugging ke liye response print karega
+print("Gumroad API Response:", result.stdout)
+
 if "success\":true" in result.stdout.lower():
-    print(f"Success! '{title}' ab aapke Gumroad product section mein LIVE hai.")
+    print(f"Mubarak ho! {title} ab list ho gaya hai.")
 else:
-    print("Kuch gadbad hui hai. Gumroad Response niche dekhein:")
-    print(result.stdout)
+    print("Upload fail hua. Check kijiye ki Token ki permission 'Write' hai ya nahi.")
