@@ -1,7 +1,7 @@
 import os, random, subprocess, fitz
 import urllib.request, urllib.parse
 
-# 1. Random PDF Select Karna
+# 1. Random PDF aur Category Selection
 categories = [d for d in os.listdir('ebooks') if os.path.isdir(f"ebooks/{d}")]
 category = random.choice(categories)
 pdf_files = [f for f in os.listdir(f"ebooks/{category}") if f.endswith('.pdf')]
@@ -17,20 +17,24 @@ cover_path = "screenshots/original_cover.jpg"
 pix.save(cover_path)
 doc.close()
 
-# 3. Pollinations AI se Title aur Description mangwana
-# Hum file name ko base banakar Pollinations se ek catchy title mangenge
-base_name = pdf_file.replace(".pdf", "").replace("_", " ")
-encoded_prompt = urllib.parse.quote(f"Create a short 3 word sales title for a book about {base_name}")
-text_api_url = f"https://text.pollinations.ai/{encoded_prompt}"
+# Browser jaisa User-Agent setup karna taaki 403 Forbidden error na aaye
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
 
-# Title Fetch karna
-with urllib.request.urlopen(text_api_url) as response:
+# 3. Pollinations AI se Title aur Description mangwana
+base_name = pdf_file.replace(".pdf", "").replace("_", " ")
+title_prompt = urllib.parse.quote(f"Create a short 3 word sales title for a book about {base_name}")
+title_url = f"https://text.pollinations.ai/{title_prompt}"
+
+# Title Fetch karna (With Headers)
+req_title = urllib.request.Request(title_url, headers=headers)
+with urllib.request.urlopen(req_title) as response:
     title = response.read().decode('utf-8').replace('"', '').strip()
 
-# Description Fetch karna
-desc_prompt = urllib.parse.quote(f"Write a 1 sentence simple description for a book titled {title}. No hashtags or stars.")
-desc_api_url = f"https://text.pollinations.ai/{desc_prompt}"
-with urllib.request.urlopen(desc_api_url) as response:
+# Description Fetch karna (With Headers)
+desc_prompt = urllib.parse.quote(f"Write a 1 sentence simple sales description for {title}. No hashtags or stars.")
+desc_url = f"https://text.pollinations.ai/{desc_prompt}"
+req_desc = urllib.request.Request(desc_url, headers=headers)
+with urllib.request.urlopen(req_desc) as response:
     description = response.read().decode('utf-8').strip()
 
 # 4. Price aur Gumroad Upload
@@ -48,4 +52,4 @@ upload_cmd = [
 ]
 
 subprocess.run(upload_cmd)
-print("Kaam poora hua! Pollinations AI ne title aur description likh diya hai.")
+print("403 Forbidden Problem Solved! Upload Successful.")
