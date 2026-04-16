@@ -1,22 +1,25 @@
-name: Gumroad Ebook Auto-Upload
+name: Bulk Sync Ebooks
 on:
-  schedule:
-    - cron: '14 23 */2 * *' # 23:14 UTC = 4:44 AM IST (Alternate Days)
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run Script
+        run: pip install requests
+
+      - name: Run Automation
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GUMROAD_TOKEN: ${{ secrets.GUMROAD_TOKEN }}
+          MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
         run: python main.py
