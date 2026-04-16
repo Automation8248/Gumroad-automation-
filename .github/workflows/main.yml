@@ -1,14 +1,18 @@
-name: Bulk Sync Ebooks
+name: Auto Post Random Ebook
+
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * *' # Roz subah 10 baje (UTC time) automatically chalega
+  workflow_dispatch:      # Manual chalane ka button bhi rahega
 
 jobs:
-  build:
+  post-ebook:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Repo mein changes save karne ki permission
+    
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -19,7 +23,15 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run Automation
+      - name: Run Automation Script
         env:
           MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
         run: python main.py
+
+      # Yeh step "posted_history.json" ko wapas repo mein save karega
+      - name: Commit and Push History
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add posted_history.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Updated posting history (30-day tracker)" && git push)
