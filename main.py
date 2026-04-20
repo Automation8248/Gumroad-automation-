@@ -16,12 +16,26 @@ HISTORY_FILE = "history.json"
 COOLING_DAYS = 3
 
 def load_history():
+    """History file ko safe tarike se load karne ka logic"""
     if os.path.exists(HISTORY_FILE):
         try:
             with open(HISTORY_FILE, 'r') as f:
-                return json.load(f)
+                # Agar file khali hai, toh json.load error dega jisko niche handle kiya hai
+                file_content = f.read().strip()
+                if not file_content:
+                    print("⚠️ Warning: history.json khali hai. Nayi history ban rahi hai.")
+                    return {}
+                    
+                data = json.loads(file_content)
+                
+                # Check karna ki data Dictionary {} hai ya nahi
+                if isinstance(data, dict):
+                    return data
+                else:
+                    print("⚠️ Warning: history.json ka format galat (List/String) tha. Nayi history ban rahi hai.")
+                    return {}
         except json.JSONDecodeError:
-            print("⚠️ Warning: history.json corrupt hai. Nayi history ban rahi hai.")
+            print("⚠️ Warning: history.json padhne mein error aaya. Nayi history ban rahi hai.")
             return {}
     return {}
 
@@ -123,7 +137,7 @@ def run_random_ebook_post():
         # Update history and save
         history[selected_folder] = current_time.isoformat()
         save_history(history)
-        print("📝 History updated.")
+        print("📝 History updated successfully.")
     else:
         print(f"❌ Make.com Error: {response.status_code} - {response.text}")
 
