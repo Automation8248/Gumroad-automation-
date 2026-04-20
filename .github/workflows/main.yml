@@ -1,22 +1,37 @@
-name: Random Ebook Post
+name: Random Ebook Post with Image-Only Cooling
 
 on:
   schedule:
-    - cron: '0 10,18 * * *' # Din mein do baar chalega (10 AM aur 6 PM UTC)
-  workflow_dispatch:
+    # Roz Indian time ke hisab se dopahar mein aur shaam mein chalega
+    - cron: '0 10,18 * * *'
+  workflow_dispatch: # Manual trigger ke liye
 
 jobs:
   post:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Ye permissions truly zaroori hain history save karne ke liye
     steps:
       - uses: actions/checkout@v3
+      
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install Requests
+          
+      - name: Install Dependencies
         run: pip install requests
+        
       - name: Run Script
         env:
           MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
         run: python main.py
+        
+      - name: Commit History Back
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add history.json
+          # Commit command fail na ho agar koi badlav na ho (echo fallback)
+          git commit -m "Update image-only posting history" || echo "No changes to commit"
+          git push
